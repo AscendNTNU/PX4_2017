@@ -1030,7 +1030,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		bool use_flow = flow_valid && (flow_accurate || !use_gps_xy);
 
 		/* use LIDAR if it's valid and lidar altitude estimation is enabled */
-		use_lidar = lidar_valid && params.enable_lidar_alt_est;
+		bool use_lidar = lidar_valid && params.enable_lidar_alt_est;
 
 		bool can_estimate_xy = (eph < max_eph_epv) || use_gps_xy || use_flow || use_vision_xy || use_mocap;
 
