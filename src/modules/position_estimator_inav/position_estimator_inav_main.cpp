@@ -315,11 +315,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 
 	float dist_ground = 0.0f;		//variables for lidar altitude estimation
 	float corr_lidar = 0.0f;
-	float lidar_offset = 0.0f;
-	int lidar_offset_count = 0;
-	bool lidar_first = true;
-	bool use_lidar = false;
-	bool use_lidar_prev = false;
+	int lidar_pos_spike_count = 0;
+	int lidar_neg_spike_count = 0;
 
 	float corr_flow[] = { 0.0f, 0.0f };	// N E
 	float w_flow = 0.0f;
@@ -548,39 +545,47 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 				    && lidar.current_distance < lidar.max_distance
 				    && (R(2, 2) > 0.7f)) {
 
-					if (!use_lidar_prev && use_lidar) {
-						lidar_first = true;
-					}
-
-					use_lidar_prev = use_lidar;
 
 					lidar_time = t;
 					dist_ground = lidar.current_distance * R(2, 2); //vertical distance
 
-					if (lidar_first) {
-						lidar_first = false;
-						lidar_offset = dist_ground + z_est[0];
-						mavlink_log_info(&mavlink_log_pub, "[inav] LIDAR: new ground offset");
-						warnx("[inav] LIDAR: new ground offset");
+					corr_lidar = - dist_ground - z_est[0];
+					bool discard_lidar = false;
+
+
+					if(dist_ground < 0.01f || dist_ground > 4.0f || fabsf(corr_lidar) > 0.8f){
+						lidar_pos_spike_count = 0;
+						lidar_neg_spike_count = 0;
+						discard_lidar = true;
 					}
 
-					corr_lidar = lidar_offset - dist_ground - z_est[0];
-
-					if (fabsf(corr_lidar) > params.lidar_err) { //check for spike
+					// Remove small lidar spikes
+					else if(corr_lidar > params.lidar_err){ //Positive spike
+						if(lidar_pos_spike_count < 5){
+							lidar_pos_spike_count++;
+							lidar_neg_spike_count = 0;
+							discard_lidar = true;
+						}
+					}
+					else if(corr_lidar < -params.lidar_err){ //Negative spike
+						if(lidar_neg_spike_count < 5){
+							lidar_neg_spike_count++;
+							lidar_pos_spike_count = 0;
+							discard_lidar = true;
+						}
+					}
+					
+					if(discard_lidar){
 						corr_lidar = 0;
 						lidar_valid = false;
-						lidar_offset_count++;
-
-						if (lidar_offset_count > 3) { //if consecutive bigger/smaller measurements -> new ground offset -> reinit
-							lidar_first = true;
-							lidar_offset_count = 0;
-						}
-
-					} else {
-						corr_lidar = lidar_offset - dist_ground - z_est[0];
+					}
+					else{
 						lidar_valid = true;
-						lidar_offset_count = 0;
 						lidar_valid_time = t;
+						if (fabsf(corr_lidar) < params.lidar_err){
+							lidar_pos_spike_count = 0;
+							lidar_neg_spike_count = 0;
+						}
 					}
 
 				} else {
