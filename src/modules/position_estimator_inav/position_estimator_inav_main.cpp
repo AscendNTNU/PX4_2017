@@ -1054,6 +1054,21 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			baro_offset += offs_corr;
 			corr_baro += offs_corr;
 		}
+		if (use_lidar) {
+			float offs_corr = corr_lidar * params.w_z_lidar * dt;
+			baro_offset += offs_corr;
+			corr_baro += offs_corr;
+		}
+		if (use_vision_z) {
+			float offs_corr = corr_lidar * w_z_vision_p * dt;
+			baro_offset += offs_corr;
+			corr_baro += offs_corr;
+		}
+		if (use_mocap){
+			float offs_corr = corr_lidar * w_mocap_p * dt;
+			baro_offset += offs_corr;
+			corr_baro += offs_corr;
+		}
 
 		/* accelerometer bias correction for GPS (use buffered rotation matrix) */
 		float accel_bias_corr[3] = { 0.0f, 0.0f, 0.0f };
