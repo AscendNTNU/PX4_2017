@@ -315,11 +315,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 
 	float dist_ground = 0.0f;		//variables for lidar altitude estimation
 	float corr_lidar = 0.0f;
-	float lidar_offset = 0.0f;
-	int lidar_offset_count = 0;
-	bool lidar_first = true;
-	bool use_lidar = false;
-	bool use_lidar_prev = false;
+	int lidar_pos_spike_count = 0;
+	int lidar_neg_spike_count = 0;
 
 	float corr_flow[] = { 0.0f, 0.0f };	// N E
 	float w_flow = 0.0f;
@@ -548,39 +545,47 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 				    && lidar.current_distance < lidar.max_distance
 				    && (R(2, 2) > 0.7f)) {
 
-					if (!use_lidar_prev && use_lidar) {
-						lidar_first = true;
-					}
-
-					use_lidar_prev = use_lidar;
 
 					lidar_time = t;
 					dist_ground = lidar.current_distance * R(2, 2); //vertical distance
 
-					if (lidar_first) {
-						lidar_first = false;
-						lidar_offset = dist_ground + z_est[0];
-						mavlink_log_info(&mavlink_log_pub, "[inav] LIDAR: new ground offset");
-						warnx("[inav] LIDAR: new ground offset");
+					corr_lidar = - dist_ground - z_est[0];
+					bool discard_lidar = false;
+
+
+					if(dist_ground < 0.01f || dist_ground > 4.0f || fabsf(corr_lidar) > 0.8f){
+						lidar_pos_spike_count = 0;
+						lidar_neg_spike_count = 0;
+						discard_lidar = true;
 					}
 
-					corr_lidar = lidar_offset - dist_ground - z_est[0];
-
-					if (fabsf(corr_lidar) > params.lidar_err) { //check for spike
+					// Remove small lidar spikes
+					else if(corr_lidar > params.lidar_err){ //Positive spike
+						if(lidar_pos_spike_count < 5){
+							lidar_pos_spike_count++;
+							lidar_neg_spike_count = 0;
+							discard_lidar = true;
+						}
+					}
+					else if(corr_lidar < -params.lidar_err){ //Negative spike
+						if(lidar_neg_spike_count < 5){
+							lidar_neg_spike_count++;
+							lidar_pos_spike_count = 0;
+							discard_lidar = true;
+						}
+					}
+					
+					if(discard_lidar){
 						corr_lidar = 0;
 						lidar_valid = false;
-						lidar_offset_count++;
-
-						if (lidar_offset_count > 3) { //if consecutive bigger/smaller measurements -> new ground offset -> reinit
-							lidar_first = true;
-							lidar_offset_count = 0;
-						}
-
-					} else {
-						corr_lidar = lidar_offset - dist_ground - z_est[0];
+					}
+					else{
 						lidar_valid = true;
-						lidar_offset_count = 0;
 						lidar_valid_time = t;
+						if (fabsf(corr_lidar) < params.lidar_err){
+							lidar_pos_spike_count = 0;
+							lidar_neg_spike_count = 0;
+						}
 					}
 
 				} else {
@@ -1025,7 +1030,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		bool use_flow = flow_valid && (flow_accurate || !use_gps_xy);
 
 		/* use LIDAR if it's valid and lidar altitude estimation is enabled */
-		use_lidar = lidar_valid && params.enable_lidar_alt_est;
+		bool use_lidar = lidar_valid && params.enable_lidar_alt_est;
 
 		bool can_estimate_xy = (eph < max_eph_epv) || use_gps_xy || use_flow || use_vision_xy || use_mocap;
 
@@ -1051,6 +1056,21 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		/* baro offset correction */
 		if (use_gps_z) {
 			float offs_corr = corr_gps[2][0] * w_z_gps_p * dt;
+			baro_offset += offs_corr;
+			corr_baro += offs_corr;
+		}
+		if (use_lidar) {
+			float offs_corr = corr_lidar * params.w_z_lidar * dt;
+			baro_offset += offs_corr;
+			corr_baro += offs_corr;
+		}
+		if (use_vision_z) {
+			float offs_corr = corr_lidar * w_z_vision_p * dt;
+			baro_offset += offs_corr;
+			corr_baro += offs_corr;
+		}
+		if (use_mocap){
+			float offs_corr = corr_lidar * w_mocap_p * dt;
 			baro_offset += offs_corr;
 			corr_baro += offs_corr;
 		}
@@ -1099,6 +1119,19 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			accel_bias_corr[2] -= corr_vision[2][0] * w_z_vision_p * w_z_vision_p;
 		}
 
+		/* transform error vector from NED frame to body frame */
+		for (int i = 0; i < 3; i++) {
+			float c = 0.0f;
+
+			for (int j = 0; j < 3; j++) {
+				c += R(j, i) * accel_bias_corr[j];
+			}
+
+			if (PX4_ISFINITE(c)) {
+				acc_bias[i] += c * params.w_acc_bias * dt;
+			}
+		}
+
 		/* accelerometer bias correction for MOCAP (use buffered rotation matrix) */
 		accel_bias_corr[0] = 0.0f;
 		accel_bias_corr[1] = 0.0f;
@@ -1135,8 +1168,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 
 		if (use_lidar) {
 			accel_bias_corr[2] -= corr_lidar * params.w_z_lidar * params.w_z_lidar;
-
-		} else {
+		} 
+		if (!use_mocap && !use_vision_z) {
 			accel_bias_corr[2] -= corr_baro * params.w_z_baro * params.w_z_baro;
 		}
 
@@ -1166,8 +1199,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		/* inertial filter correction for altitude */
 		if (use_lidar) {
 			inertial_filter_correct(corr_lidar, dt, z_est, 0, params.w_z_lidar);
-
-		} else {
+		}
+		if(!use_mocap && !use_vision_z) {
 			inertial_filter_correct(corr_baro, dt, z_est, 0, params.w_z_baro);
 		}
 
