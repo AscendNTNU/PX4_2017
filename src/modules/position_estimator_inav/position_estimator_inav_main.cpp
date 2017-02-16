@@ -824,8 +824,11 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 				if (!params.disable_mocap) {
 					/* reset position estimate on first mocap update */
 					if (!mocap_valid) {
-						x_est[0] = mocap.x;
-						y_est[0] = mocap.y;
+						// For test use, send x or y > 10000 to ignore them and only use z
+						if(mocap.x < 10000 && mocap.z < 10000){
+							x_est[0] = mocap.x;
+							y_est[0] = mocap.y;
+						} 						
 						z_est[0] = mocap.z;
 
 						mocap_valid = true;
@@ -835,8 +838,14 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 					}
 
 					/* calculate correction for position */
-					corr_mocap[0][0] = mocap.x - x_est[0];
-					corr_mocap[1][0] = mocap.y - y_est[0];
+					// For test use, send x or y > 10000 to ignore them and only use z
+					if(mocap.x < 10000 && mocap.z < 10000){
+						corr_mocap[0][0] = mocap.x - x_est[0];
+						corr_mocap[1][0] = mocap.y - y_est[0];
+					} else {
+						corr_mocap[0][0] = 0;
+						corr_mocap[1][0] = 0;
+					}
 					corr_mocap[2][0] = mocap.z - z_est[0];
 
 					mocap_updates++;
