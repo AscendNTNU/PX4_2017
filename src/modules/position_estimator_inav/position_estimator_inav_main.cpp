@@ -74,9 +74,6 @@
 #include "position_estimator_inav_params.h"
 #include "inertial_filter.h"
 
-unsigned int baro_print_cnt = 0;
-unsigned int moc_baro_corr_cnt = 0;
-
 #define MIN_VALID_W 0.00001f
 #define PUB_INTERVAL 10000	// limit publish rate to 100 Hz
 #define EST_BUF_SIZE 250000 / PUB_INTERVAL		// buffer size is 0.5s
@@ -527,12 +524,6 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 
 				if (sensor.timestamp + sensor.baro_timestamp_relative != baro_timestamp) {
 					corr_baro = baro_offset - sensor.baro_alt_meter - z_est[0];
-					baro_print_cnt++;
-					if(baro_print_cnt > 20){
-						mavlink_log_info(&mavlink_log_pub, "[inav] Baro alt: %.3f", (double)(baro_offset - sensor.baro_alt_meter));
-						mavlink_log_info(&mavlink_log_pub, "[inav] Baro offset: %.3f", (double)baro_offset);
-						baro_print_cnt = 0;
-					}
 					baro_timestamp = sensor.timestamp + sensor.baro_timestamp_relative;
 					baro_updates++;
 				}
