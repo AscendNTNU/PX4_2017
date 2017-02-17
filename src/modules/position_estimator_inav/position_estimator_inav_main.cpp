@@ -74,6 +74,9 @@
 #include "position_estimator_inav_params.h"
 #include "inertial_filter.h"
 
+unsigned int baro_print_cnt = 0;
+unsigned int moc_baro_corr_cnt = 0;
+
 #define MIN_VALID_W 0.00001f
 #define PUB_INTERVAL 10000	// limit publish rate to 100 Hz
 #define EST_BUF_SIZE 250000 / PUB_INTERVAL		// buffer size is 0.5s
@@ -524,6 +527,12 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 
 				if (sensor.timestamp + sensor.baro_timestamp_relative != baro_timestamp) {
 					corr_baro = baro_offset - sensor.baro_alt_meter - z_est[0];
+					baro_print_cnt++;
+					if(baro_print_cnt > 20){
+						mavlink_log_info(&mavlink_log_pub, "[inav] Baro alt: %.3f", (double)(baro_offset - sensor.baro_alt_meter));
+						mavlink_log_info(&mavlink_log_pub, "[inav] Baro offset: %.3f", (double)baro_offset);
+						baro_print_cnt = 0;
+					}
 					baro_timestamp = sensor.timestamp + sensor.baro_timestamp_relative;
 					baro_updates++;
 				}
@@ -1063,6 +1072,10 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		}
 
 		/* baro offset correction */
+		// The baro offset correction for GPS and lidar assumes that baro is in use and that the estimates used in
+		// the corrections depend on the barometer. For vision and mocap this is not the case. Then we want to correct the
+		// baro offset in the background so that the baro measurements agree with the mocap/vision in case mocap/vision is lost.
+		// In that case the estimates depend on vision/mocap and corr_baro is used, not corr_vision or corr_mocap.
 		if (use_gps_z) {
 			float offs_corr = corr_gps[2][0] * w_z_gps_p * dt;
 			baro_offset += offs_corr;
@@ -1074,12 +1087,12 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			corr_baro += offs_corr;
 		}
 		if (use_vision_z) {
-			float offs_corr = corr_vision[2][0] * w_z_vision_p * dt;
+			float offs_corr = -corr_baro * dt;
 			baro_offset += offs_corr;
 			corr_baro += offs_corr;
 		}
 		if (use_mocap){
-			float offs_corr = corr_mocap[2][0] * w_mocap_p * dt;
+			float offs_corr = -corr_baro * dt;
 			baro_offset += offs_corr;
 			corr_baro += offs_corr;
 		}
