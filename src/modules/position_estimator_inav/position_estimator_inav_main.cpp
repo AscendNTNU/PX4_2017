@@ -1074,12 +1074,12 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			corr_baro += offs_corr;
 		}
 		if (use_vision_z) {
-			float offs_corr = corr_lidar * w_z_vision_p * dt;
+			float offs_corr = corr_vision[2][0] * w_z_vision_p * dt;
 			baro_offset += offs_corr;
 			corr_baro += offs_corr;
 		}
 		if (use_mocap){
-			float offs_corr = corr_lidar * w_mocap_p * dt;
+			float offs_corr = corr_mocap[2][0] * w_mocap_p * dt;
 			baro_offset += offs_corr;
 			corr_baro += offs_corr;
 		}
