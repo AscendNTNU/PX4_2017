@@ -68,7 +68,7 @@ PARAM_DEFINE_FLOAT(ATT_W_MAG, 0.1f);
  * @min 0
  * @max 1
  */
-PARAM_DEFINE_FLOAT(ATT_W_EXT_HDG, 0.1f);
+PARAM_DEFINE_FLOAT(ATT_W_EXT_HDG, 0.3f);
 
 /**
  * Complimentary filter gyroscope bias weight
@@ -113,7 +113,7 @@ PARAM_DEFINE_INT32(ATT_MAG_DECL_A, 1);
  * @min 0
  * @max 2
  */
-PARAM_DEFINE_INT32(ATT_EXT_HDG_M, 0);
+PARAM_DEFINE_INT32(ATT_EXT_HDG_M, 2);
 
 /**
  * Acceleration compensation based on GPS
