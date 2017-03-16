@@ -2335,7 +2335,7 @@ MulticopterPositionControl::task_main()
 		 * attitude setpoints for the transition).
 		 */
 		if (!(_control_mode.flag_control_offboard_enabled &&
-		      !(_control_mode.flag_control_climbrate_enabled ||
+		      !(_control_mode.flag_control_climb_rate_enabled ||
 			_control_mode.flag_control_velocity_enabled ||
 			_control_mode.flag_control_acceleration_enabled))) {
 
