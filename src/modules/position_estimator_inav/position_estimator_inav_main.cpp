@@ -553,7 +553,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 					bool discard_lidar = false;
 
 
-					if(dist_ground < 0.01f || dist_ground > 4.0f || fabsf(corr_lidar) > 0.8f){
+					if(dist_ground < 0.01f || dist_ground > 4.0f){
 						lidar_pos_spike_count = 0;
 						lidar_neg_spike_count = 0;
 						discard_lidar = true;
