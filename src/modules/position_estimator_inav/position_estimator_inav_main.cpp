@@ -255,7 +255,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 	float epv_vision = 0.2f;
 
 	float eph_mocap = 0.05f;
-	float epv_mocap = 0.05f;
+	//float epv_mocap = 0.05f;
 
 	float x_est_prev[2], y_est_prev[2], z_est_prev[2];
 	memset(x_est_prev, 0, sizeof(x_est_prev));
@@ -824,12 +824,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 				if (!params.disable_mocap) {
 					/* reset position estimate on first mocap update */
 					if (!mocap_valid) {
-						// For test use, send x or y > 10000 to ignore them and only use z
-						if(mocap.x < 10000 && mocap.z < 10000){
-							x_est[0] = mocap.x;
-							y_est[0] = mocap.y;
-						} 						
-						z_est[0] = mocap.z;
+						x_est[0] = mocap.x;
+						y_est[0] = mocap.y;
 
 						mocap_valid = true;
 
@@ -838,15 +834,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 					}
 
 					/* calculate correction for position */
-					// For test use, send x or y > 10000 to ignore them and only use z
-					if(mocap.x < 10000 && mocap.z < 10000){
-						corr_mocap[0][0] = mocap.x - x_est[0];
-						corr_mocap[1][0] = mocap.y - y_est[0];
-					} else {
-						corr_mocap[0][0] = 0;
-						corr_mocap[1][0] = 0;
-					}
-					corr_mocap[2][0] = mocap.z - z_est[0];
+					corr_mocap[0][0] = mocap.x - x_est[0];
+					corr_mocap[1][0] = mocap.y - y_est[0];
 
 					mocap_updates++;
 				}
@@ -1153,7 +1142,7 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		if (use_mocap) {
 			accel_bias_corr[0] -= corr_mocap[0][0] * w_mocap_p * w_mocap_p;
 			accel_bias_corr[1] -= corr_mocap[1][0] * w_mocap_p * w_mocap_p;
-			accel_bias_corr[2] -= corr_mocap[2][0] * w_mocap_p * w_mocap_p;
+			//accel_bias_corr[2] -= corr_mocap[2][0] * w_mocap_p * w_mocap_p;
 		}
 
 		/* transform error vector from NED frame to body frame */
@@ -1182,7 +1171,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		if (use_lidar) {
 			accel_bias_corr[2] -= corr_lidar * params.w_z_lidar * params.w_z_lidar;
 		} 
-		if (!use_mocap && !use_vision_z) {
+		//if (!use_mocap && !use_vision_z) {
+		else {
 			accel_bias_corr[2] -= corr_baro * params.w_z_baro * params.w_z_baro;
 		}
 
@@ -1213,7 +1203,8 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		if (use_lidar) {
 			inertial_filter_correct(corr_lidar, dt, z_est, 0, params.w_z_lidar);
 		}
-		if(!use_mocap && !use_vision_z) {
+		//if(!use_mocap && !use_vision_z) {
+		else {
 			inertial_filter_correct(corr_baro, dt, z_est, 0, params.w_z_baro);
 		}
 
@@ -1229,10 +1220,10 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 			inertial_filter_correct(corr_vision[2][0], dt, z_est, 0, w_z_vision_p);
 		}
 
-		if (use_mocap) {
+		/*if (use_mocap) {
 			epv = fminf(epv, epv_mocap);
 			inertial_filter_correct(corr_mocap[2][0], dt, z_est, 0, w_mocap_p);
-		}
+		}*/
 
 		if (!(PX4_ISFINITE(z_est[0]) && PX4_ISFINITE(z_est[1]))) {
 			write_debug_log("BAD ESTIMATE AFTER Z CORRECTION", dt, x_est, y_est, z_est, x_est_prev, y_est_prev, z_est_prev,
