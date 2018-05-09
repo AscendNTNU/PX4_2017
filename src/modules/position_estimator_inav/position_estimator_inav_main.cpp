@@ -1182,9 +1182,11 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		if (use_lidar) {
 			accel_bias_corr[2] -= corr_lidar * params.w_z_lidar * params.w_z_lidar;
 		} 
+                /*
 		if (!use_mocap && !use_vision_z) {
 			accel_bias_corr[2] -= corr_baro * params.w_z_baro * params.w_z_baro;
 		}
+                */
 
 		/* transform error vector from NED frame to body frame */
 		for (int i = 0; i < 3; i++) {
@@ -1213,9 +1215,11 @@ int position_estimator_inav_thread_main(int argc, char *argv[])
 		if (use_lidar) {
 			inertial_filter_correct(corr_lidar, dt, z_est, 0, params.w_z_lidar);
 		}
+                /*
 		if(!use_mocap && !use_vision_z) {
 			inertial_filter_correct(corr_baro, dt, z_est, 0, params.w_z_baro);
 		}
+                */
 
 		if (use_gps_z) {
 			epv = fminf(epv, gps.epv);
